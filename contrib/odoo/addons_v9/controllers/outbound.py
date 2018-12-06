@@ -425,11 +425,12 @@ class exporter(object):
         mfg_route = None
         for i in rts.read(ids, fields, self.req.session.context):
             stock_location_routes[i['id']] = i
-            if i['name'] == 'Buy':
-              # Recognize items that can be purchased
-              buy_route = i['id']
-            if i['name'] == 'Manufacture':
-              mfg_route = i['id']
+            if i['name']:
+                if i['name'].lower().startswith('buy'):
+                    # Recognize items that can be purchased
+                    buy_route = i['id']
+                if i['name'].lower().startswith('manufacture'):
+                    mfg_route = i['id']
 
         # Read the products
         m = self.req.session.model('product.product')
