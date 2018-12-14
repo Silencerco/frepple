@@ -129,6 +129,7 @@ class importer(object):
             countmfg += 1
         except Exception as e:
           msg.append(str(e))
+          raise e
         # Remove the element now to keep the DOM tree small
         root.clear()
       elif event == 'start' and elem.tag == 'operationplans':
