@@ -78,7 +78,7 @@ class importer(object):
     countmfg = 0
     for event, elem in iterparse(self.datafile, events=('start', 'end')):
       if event == 'end' and elem.tag == 'operationplan':
-        uom_id, item_id = elem.get('item').split(',')
+        uom_id, item_id = elem.get('item_id').split(',')
         n = elem.get('operation')
         try:
           if n.startswith('Purchase'):  # TODO missing fields warehouse and preferred routes (with implications)
