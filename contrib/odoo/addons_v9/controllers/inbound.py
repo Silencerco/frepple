@@ -81,6 +81,16 @@ class importer(object):
         uom_id, item_id = elem.get('item_id').split(',')
         n = elem.get('operation')
         try:
+          loc_id = elem.get('location_id')
+          if loc_id:
+            loc_id = int(loc_id)
+          else:
+            location_id = self.req.session.model('stock.location').search([('complete_name', 'ilike', elem.get('location'))], limit=1)
+            if location_id:
+              loc_id = location_id[0]
+            else:
+              raise Exception('Cannot find location %s' % elem.get('location'))
+
           if n.startswith('Purchase'):  # TODO missing fields warehouse and preferred routes (with implications)
             # Create purchase quotation
             x = proc_order.create({
@@ -90,7 +100,7 @@ class importer(object):
               'product_id': int(item_id),
               'company_id': self.company.id,
               'product_uom': int(uom_id),
-              'location_id': int(elem.get('location')),
+              'location_id': loc_id,
               #'procure_method': 'make_to_order', # this field is no longer there
               # : elem.get('criticality'),
               'origin': 'frePPLe'
@@ -108,7 +118,7 @@ class importer(object):
               'product_id': int(item_id),
               'company_id': self.company.id,
               'product_uom': int(uom_id),
-              'location_src_id': int(elem.get('location')),
+              'location_src_id': loc_id,
               'product_uos_qty': False,
               'product_uos': False,
               'bom_id': False,
