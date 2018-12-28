@@ -907,8 +907,8 @@ class exporter(object):
                 if not location or not operation in self.operations:
                     continue
                 qty = self.convert_qty_uom(i['product_qty'], i['product_uom'][0], i['product_id'][0])
-                yield '<operationplan start="%s" end="%s" quantity="%s" status="%s"><operation name=%s/></operationplan>\n' % (
-                    startdate, startdate, qty, i['state'], quoteattr(operation)
+                yield '<operationplan start="%s" end="%s" quantity="%s" status="confirmed"><operation name=%s/></operationplan>\n' % (
+                    startdate, startdate, qty, quoteattr(operation)
                 )
         yield '</operationplans>\n'
 
