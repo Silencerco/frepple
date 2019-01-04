@@ -654,8 +654,8 @@ class exporter(object):
                           '<loads><load quantity="1"><resource name=%s/></load></loads>\n' % (
                             step[2],
                             quoteattr("%s - %s" % (operation, step[2])),
-                            quoteattr(location),
-                            step[1], quoteattr(step[0])
+                            int(step[1]), quoteattr(location),
+                            quoteattr(step[0])
                             )
                     if step[2] == steplist[-1][2]:
                         # Add producing flows on the last routing step
