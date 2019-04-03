@@ -163,9 +163,9 @@ def Upload(request):
       i.save(using=request.database)
     return HttpResponse("OK")
 
-  except HTTPError:
-    logger.error("Can't connect to the Odoo server")
-    return HttpResponseServerError("Can't connect to the odoo server")
+  except HTTPError as he:
+    logger.error("Can't connect to the Odoo server: %s" % he)
+    return HttpResponseServerError("Can't connect to the odoo server" % he)
 
   except Exception as e:
     logger.error(e)

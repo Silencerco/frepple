@@ -425,10 +425,10 @@ class exporter(object):
         mfg_route = None
         for i in rts.read(ids, fields, self.req.session.context):
             stock_location_routes[i['id']] = i
-            if i['name'] == 'Buy':
+            if i['name'] and i['name'].lower().startswith('buy'):
               # Recognize items that can be purchased
               buy_route = i['id']
-            if i['name'] == 'Manufacture':
+            if i['name'] and i['name'].lower().startswith('manufacture'):
               mfg_route = i['id']
 
         # Read the products
@@ -638,14 +638,24 @@ class exporter(object):
                 yield '<suboperations>'
                 steplist = mrp_routing_workcenters[i['routing_id'][0]]
                 for step in steplist:
+                    # Section to use when modeling bucketized resources
+                    # yield '<suboperation priority="%s">' \
+                    #      '<operation name=%s duration="PT%dH" xsi:type="operation_fixed_time">\n' \
+                    #      '<location name=%s/>\n' \
+                    #      '<loads><load quantity="1"><resource name=%s/></load></loads>\n' % (
+                    #        step[2],
+                    #        quoteattr("%s - %s" % (operation, step[2])),
+                    #        int(step[1]), quoteattr(location),
+                    #        step[1], quoteattr(step[0])
+                    #        )
                     yield '<suboperation priority="%s">' \
-                          '<operation name=%s duration="PT%dH" xsi:type="operation_fixed_time">\n' \
+                          '<operation name=%s duration="PT%dH" xsi:type="operation_time_per">\n' \
                           '<location name=%s/>\n' \
-                          '<loads><load quantity="%f"><resource name=%s/></load></loads>\n' % (
+                          '<loads><load quantity="1"><resource name=%s/></load></loads>\n' % (
                             step[2],
                             quoteattr("%s - %s" % (operation, step[2])),
                             int(step[1]), quoteattr(location),
-                            step[1], quoteattr(step[0])
+                            quoteattr(step[0])
                             )
                     if step[2] == steplist[-1][2]:
                         # Add producing flows on the last routing step
@@ -694,6 +704,8 @@ class exporter(object):
                                 quoteattr(product['name'])
                             )
                         yield '</flows>\n'
+                    # Comment the next line when modeling bucketized resources
+                    yield '<duration_per>PT%dH</duration_per>' % int(step[1])
                     yield '</operation></suboperation>\n'
                 yield '</suboperations>\n'
             yield '</operation>\n'
@@ -865,9 +877,9 @@ class exporter(object):
                 start = j['date_order'].replace(' ', 'T')
                 end = i['date_planned'].replace(' ', 'T')
                 qty = self.convert_qty_uom(i['product_qty'] - i['qty_received'], i['product_uom'][0], i['product_id'][0])
-                yield '<operationplan ordertype="PO" start="%s" end="%s" quantity="%f" status="confirmed">' \
+                yield '<operationplan reference="%s %s" ordertype="PO" start="%s" end="%s" quantity="%f" status="confirmed">' \
                   '<item name=%s/><location name=%s/><supplier name=%s/>' % (
-                    start, end, qty, quoteattr(item['name']), quoteattr(location),
+                    j['name'], i['id'], start, end, qty, quoteattr(item['name']), quoteattr(location),
                     quoteattr('%d %s' % (j['partner_id'][0], j['partner_id'][1]))
                     )
                 yield '</operationplan>\n'
@@ -890,25 +902,35 @@ class exporter(object):
         yield '<!-- manufacturing orders in progress -->\n'
         yield '<operationplans>\n'
         m = self.req.session.model('mrp.production')
-        ids = m.search(['|', ('state', '=', 'in_production'), ('state', '=', 'confirmed')],
-                       context=self.req.session.context)
+        w = self.req.session.model('mrp.production.workcenter.line')
+        w_fields = ['workcenter_id', ]
+        ids = m.search(
+          [('state', 'in', ['in_production', 'ready', 'confirmed'])],
+          context=self.req.session.context
+          )
         fields = ['bom_id', 'date_start', 'date_planned', 'name', 'state', 'product_qty', 'product_uom',
-                  'location_dest_id', 'product_id']
+                  'location_dest_id', 'product_id', 'product_tmpl_id', 'workcenter_lines']
         for i in m.read(ids, fields, self.req.session.context):
+            logger.warn("PPPPPP  %s" % i)
             if i['state'] in ('in_production', 'confirmed', 'ready') and i['bom_id']:
                 # Open orders
                 location = self.map_locations.get(i['location_dest_id'][0], None)
-                operation = u'%d %s @ %s' % (i['bom_id'][0], i['bom_id'][1], location)
+                product_buf = self.product_template_product.get(i['product_tmpl_id'][0], None)
+                operation = u'%d %s @ %s' % (i['bom_id'][0], product_buf['name'], location)
                 try:
                     startdate = datetime.strptime(i['date_start'] or i['date_planned'], '%Y-%m-%d %H:%M:%S')
-                except:
+                except Exception:
                     continue
                 if not location or not operation in self.operations:
                     continue
                 qty = self.convert_qty_uom(i['product_qty'], i['product_uom'][0], i['product_id'][0])
-                yield '<operationplan operation=%s start="%s" end="%s" quantity="%s" locked="true"/>\n' % (
-                    quoteattr(operation), startdate, startdate, qty
+                yield '<operationplan reference=%s start="%s" end="%s" quantity="%s" status="confirmed"><operation name=%s/><loadplans>\n' % (
+                    quoteattr(i['name']), startdate, startdate, qty, quoteattr(operation)
                 )
+                for j in w.read(i['workcenter_lines'], w_fields, self.req.session.context):
+                  if j['workcenter_id'][0] in self.map_workcenters:
+                    yield '<loadplan status="confirmed"><resource name=%s/></loadplan>' % quoteattr(self.map_workcenters[j['workcenter_id'][0]])
+                yield '</loadplans></operationplan>'
         yield '</operationplans>\n'
 
 
